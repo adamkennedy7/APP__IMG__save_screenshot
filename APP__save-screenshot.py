@@ -3,6 +3,8 @@ APP_NAME = "APP__save-screenshot.py"
 """
 
 TO DO
+[!] NOT LOGGING TO LOG FILE! Otherwise works perfectly.
+
 [i] Refactor the approach to getting formatted strings from dictionaries in a function like log_dict(dict, level=3, marker="-") which returns a string that represents the dictionary including indents via the `marker[0]` character
 //[u] Add verbose level 0 logs to indicate single-word tags like INITIALIZING, CAPTURING, SAVING, ANALYZING, LOGGING
     [i] Add some more logs with various levels of verbosity as you see fit, but keep in mind: 1 should be single words, upper-case, 2 is the user-friendly input and output dialogs
@@ -23,6 +25,7 @@ from FCN__datetime__now import now
 import platform
 import psutil
 from FCN__time__t42 import t42
+import socket
 
 t = str(now())
 PY = os.path.dirname(os.path.abspath(__file__))
@@ -89,6 +92,8 @@ def configure_logging():
     logging.basicConfig(filename=log_path, level=logging.INFO,
                         format='%(asctime)s - %(levelname)s - %(message)s')
 
+configure_logging()
+
 # Prints information to the terminal and a log file
 def log(message, level=1, marker="", comment=""):
     """
@@ -115,18 +120,38 @@ def log(message, level=1, marker="", comment=""):
     if VERBOSE_LEVEL >= level:
         print(msg_line)
     
-    # Log everything, regardless of verbose level. 
+    # Log everything, regardless of verbose level.
+    # SAVE LOG TO TXT FILE 
     logging.info(msg_line)
 
-    # SAVE a history.log file to the \LOG directory
-def log_break(): log("\n---\n",1)
+def log_dict(dictionary, level=3, marker="-"):
+    """
+    Returns a string that represents the dictionary in a formatted manner.
+    """
+    formatted_string = ""
+    indent = (marker + '  ') * level
+    for key, value in dictionary.items():
+        formatted_string += f"{indent}{key}: {value}\n"
+    return formatted_string.strip()
 
-# Get the file name / path
+def path_to_array(path):
+    return path.split(os.sep)
+
+
+def log_break(): log("\n------------------------------------------------\n",1)
+
+log_break()
+
+# Log app name information
 log(APP_NAME)
 log(PY,2)
 log("##todo folder path tree via `dict__log(path__dict(PY))`",3)
 log("clock_in = " + t, 2)
 
+# Print log path to log
+log("log = " + os.path.join(os.path.dirname(os.path.abspath(__file__)), LOG_DIRECTORY, "LOG__" + now() + ".txt"),2)
+
+log_break()
 log("INITIALIZING...", 1)
 log("Reading `config.ini`", 2)
 log(str(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config.ini')), 3)
@@ -142,7 +167,6 @@ def get_config_ini():
             log(f"{key}: {value}", 4)
 
 get_config_ini()
-
 
 # note to self
 # Analysis of a saved image, to expand upon this and refactor later
@@ -163,7 +187,6 @@ def analyze_image(image, save_path):
     }
     
     return findings
-
 
 # to be refactored?
 def save_screenshot():
@@ -190,11 +213,15 @@ def save_screenshot():
         log("##todo FOLDER TREE HERE VIA `dict__log(path__dict(save_path))`", 3)
 
         log("ANALYZING...")
-        if VERBOSE_LEVEL >= 4:
+        if VERBOSE_LEVEL >= 2:
             image_data = analyze_image(IMG, save_path) # `dict__log(path__dict(image_data))` 
             for key, value in image_data.items():
-                log(f"{key}: {value}", level=3)
-        
+                log(f"{key}: {value}", level=2)
+        log("RESULTS LOGGED.")
+        # Print log path to log
+        log("log = " + os.path.join(os.path.dirname(os.path.abspath(__file__)), LOG_DIRECTORY, "LOG__" + now() + ".txt"),2)
+
+
         log_break()
         log("COMPLETED IN " + stopwatch() + "\n",1)
         log("CURRENT TIME " + str(now()),2)
@@ -204,7 +231,10 @@ def save_screenshot():
         error_message = f"An error occurred: {type(e).__name__} - {e}"
         log(error_message, level=1)
         return False
-    
+
+def dict__log(path):
+    path_dict = {"Path": path, "Parts": path_to_array(path)}
+    return log_dict(path_dict)
 
 if __name__ == '__main__':
     result = save_screenshot()
@@ -218,3 +248,9 @@ if __name__ == '__main__':
         for key, value in system_info.items():
             log(f"{key}: {value}", level=6)
         print()
+        NETWORK_INFO = {
+        'IP Address': socket.gethostbyname(socket.gethostname()),
+        'Hostname': socket.gethostname(),
+        # Add more network-related information if needed
+        # todo add network info via new dict --> string --> log flow
+}
