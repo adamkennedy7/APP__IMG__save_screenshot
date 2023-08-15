@@ -16,6 +16,7 @@ import platform
 import psutil
 from prettytable import PrettyTable
 from screeninfo import get_monitors
+import wmi
 
 
 # todo use this to manage the success vs fail line at very end
@@ -61,6 +62,34 @@ SYSTEM_INFO = {
     'Physical Cores': psutil.cpu_count(logical=False),
     'Logical Cores': psutil.cpu_count(logical=True)
 }
+
+import subprocess
+import re
+
+def get_network_info():
+    try:
+        output = subprocess.check_output(["ipconfig"]).decode('utf-8')
+        interfaces = [info for info in output.split("\n\n") if info]
+
+        network_dict = {}
+        current_iface = None
+        for line in output.splitlines():
+            if_name_match = re.search(r"([a-zA-Z0-9]* [a-zA-Z0-9 .()\-]+):", line)
+            ip_match = re.search(r"IPv4 Address[ .]*: (\d+\.\d+\.\d+\.\d+)", line)
+            
+            if if_name_match:
+                current_iface = if_name_match.group(1)
+                network_dict[current_iface] = {}
+
+            if current_iface and ip_match:
+                network_dict[current_iface]['inet'] = ip_match.group(1)
+                # Add more fields as required
+
+        return network_dict
+
+    except Exception as e:
+        print(f"Error: {e}")
+        return {}
 
 # define how to load the config file
 def load_config_ini():
@@ -202,12 +231,15 @@ log(1, "---")
 
 log(1, "INITIALIZING", "▶️")
 log(2, f"Script path: {PY}", "📂")
+
 log(3, "SYSTEM_INFO")
 log(3, SYSTEM_INFO, "ℹ️")
-log(3, "NETWORK_INFO", "🌐")
-log(3, "coming soon")
 
-def ok(level = 0):
+log(3, "NETWORK_INFO")
+NETWORK_INFO = get_network_info()
+log(3, NETWORK_INFO, "🌐")
+
+def log_stopwatch(level = 0):
     log(level,f"⏱️  {stopwatch()} sec","")
 
 def get_display_info():
@@ -233,7 +265,7 @@ log(2, f"Logging to ------ {MAIN_PATH}\{LOG_DIRECTORY}")
 
 def get_screenshot():
     global perf_counter_stop
-    ok(2)
+    log_stopwatch(2)
     log(1, "CAPTURING", "📷")
     log(2, "Capturing a screenshot..")
     try:
