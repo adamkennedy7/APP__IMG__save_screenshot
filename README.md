@@ -1,61 +1,51 @@
-# APP__save-screenshot.py
+# APP__save-screenshot.py Documentation
 
-## Overview
+Adam Kennedy
 
-This Python script, named `APP__save-screenshot.py`, is a console application that captures a screenshot of the current display and provides various analysis and logging functionalities.
+Github @adamkennedy7
 
-## Context
+## Introduction
 
-The script runs within the context of creating an enterprise application, as described by the user profile. It builds on the functionality of the `FCN__time__t62` module, naming its class instance `T62`. The script takes captures of the screen for further analysis.
+The `APP__save-screenshot.py` script captures screenshots, analyzes images, and logs various system and image-related information. It is designed to facilitate the process of capturing, saving, and analyzing screenshots efficiently.
 
-## Imports and Constants
+## Features
 
-The script starts by importing needed modules such as `os`, `time`, `configparser`, `ImageGrab`, `ImageStat`, `logging`, `platform`, and `psutil`. Imported modules are used to facilitate various tasks within the script. Several constants and paths are also defined for configuration and path management.
+- Capturing screenshots using the `ImageGrab` module.
+- Logging system information and script execution details.
+- Saving captured screenshots to designated directories.
+- Displaying primary monitor information using the `screeninfo` module.
+- Analyzing image statistics using the `ImageStat` module.
+- Formatting log output using the `prettytable` module.
 
-## Functions
+## Dependencies
 
-The script includes several functions for various tasks:
+The script requires the following Python libraries:
 
-### `stopwatch()`
+- `PIL` (Python Imaging Library): Used for capturing screenshots, analyzing image statistics, and enhancing images.
+- `prettytable`: Used for formatting dictionaries and nested data structures in the log output.
+- `psutil`: Used for retrieving system information like CPU details.
+- `screeninfo`: Used to gather information about the primary monitor.
 
-This function begins the stopwatch for performance tracking. It returns the elapsed time since the stopwatch was set.
+## Usage
 
-### `load_config_ini()`
+To execute the script, run it in your Python environment.
 
-This function loads application configurations from `__config.ini` using the `configparser` module.
+Upon execution, the script performs the following actions:
 
-### `configure_logging()`
+1. Captures a screenshot using the `ImageGrab` module.
+2. Logs detailed system information, including operating system details and processor information.
+3. Logs primary monitor information, such as name, dimensions, and primary status.
+4. Logs image information, including size, color mode, memory address, format, and meta-information.
+5. Saves the captured screenshot to a designated directory.
+6. Counts the number of "IMG__" files adjacent to the saved image.
+7. Calculates and logs the script's execution time.
+8. Outputs a completion message with relevant details.
 
-This function configures the logging system to print to the terminal and save to a text file. It is called to set up the logging system.
+## Customization
 
-### `log(level, message, emoji="")`
+You can customize the behavior of the script by modifying the configuration settings in the `__config.ini` file. This includes enabling or disabling logging, specifying directories, and adjusting verbosity levels.
 
-This function handles logging to both the terminal and log file. It has special handling for various types of data such as ints, lists, and dictionaries. When handling dictionaries, it uses the `PrettyTable` module to draw tables with left-aligned text.
+## Credits
 
-### `get_screenshot()`
-
-This function captures a screenshot using `ImageGrab.grab()`. It returns the captured image or `False` in case of an error.
-
-### `save_screenshot(image)`
-
-This function saves the captured image to a path defined by `IMG_PATH`.
-
-### `analyze_image(image, file_path)`
-
-This function performs analysis on the captured image. It returns various findings such as resolution, file size, mean color, and extrema.
-
-## Script Execution
-
-The script begins with the loading of configurations from `__config.ini`. It then sets up the logging system and captures a screenshot using `get_screenshot()`. The captured image is then saved using `save_screenshot()`. Analysis of the image is conducted using `analyze_image()`, which provides various findings such as resolution, file size, and color information.
-
-## Terminal Output
-
-The terminal output provides information about the script's progress, including messages, logs, and tables. The logging system is used to record these messages and findings to a text file.
-
-## Conclusion
-
-This script, `APP__save-screenshot.py`, is a comprehensive application for capturing screenshots, analyzing them, and logging various findings. It uses multiple functions to facilitate these tasks and provides detailed output to the terminal and log file.
-
-*If you have any further questions or need more clarification, feel free to ask!*
-
-*(Please note that comments within the code are always written in `Stair_Case`, as per your preferences)*
+- The script's structure and modular design were influenced by the works of Adam Kennedy.
+- Various Python libraries were used to enhance functionality, including `PIL`, `prettytable`, `psutil`, and `screeninfo`.
