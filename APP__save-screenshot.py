@@ -1,72 +1,43 @@
 APP_NAME = "APP__save-screenshot.py"
+VERSION = "tMZaf6s"
 
-"""
+import time
+from FCN__time__t62 import t62
 
-TO DO
-
-[] add directory link at end of log:
-    |  APP DIRECTORY
-    |  |  o:\DAT\ ...
-
-[] add verbose flag to log name
-        "LOG__20230809-020735__lv=9001"
-
-[] fcn_log() adds a verbose log() which states the name of the function containing fcn_log() and its arguments. 
-
-[] Refactor log() and give it logic to determine `msg` and if necessary:
-    [] parse int to str
-    [] parse array to formatted str with line breaks
-    [] parse dict to formatted str with line breaks
-
-[] Create a helper function which will turn a os.path into an array like ["O:","DAT","OneDrive","CODE","py","APP__IMG__save-screenshot","IMG","IMG__SCREENSHOT__20230809-024609.png"]
-        # might be able to pull this from `file mermaid`
-
-[] Create a "NETWORK_INFO" dictionary which provides network information like IP address, user name and info, etc. So we can print log(network_info_dict, 8)
-
-[x] Define a constant PY as the full path of the current python script that is being executed
-    []improve so that it also shows the .py file as well as the abspath
-
-## FCN__path_to_dictionary(path) to get a file `path` and return a dictionary of arrays with the following key value pairs
-        'breadcrumb_index' : [name, file_id] # other info TBD
-
-                ? What else would I want to convert to dictionaries...?
-
-## FCN dict_to_log(dict, n)
-    inputs any dictionary like the above `path_to_dictionary()`
-    Produces log() lines
-    return void 
-
-####################
-
-## Edge cases to check
-[] what if it tries to save two within the same second, would it overwrite the other or have an error?
-
-
-
-
-
-"""
+t = str(time.strftime('%Y%m%d%H%M%S'))
+T62 = t62()
 
 import os
-import time
 import configparser
 from PIL import ImageGrab, ImageStat
+from PIL import ImageEnhance, ImageFilter
 import logging
-from FCN__datetime__now import now
 import platform
 import psutil
-from FCN__time__t42 import t42
+from prettytable import PrettyTable
+from screeninfo import get_monitors
 
-t = str(now())
-PY = os.path.dirname(os.path.abspath(__file__))
 
-# Clear the terminal
-# os.system('cls')
+# todo use this to manage the success vs fail line at very end
+ERROR_CODE = 0
 
-# Constants for configuration keys
+
+
+# begin stopwatch for performance tracking
+start_time = time.perf_counter()
+perf_counter_stop = 0
+def stopwatch():
+    elapsed_time = time.perf_counter() - start_time
+    return f"{elapsed_time:.10f}"
+
+# get the path of this python file
+PY = os.path.abspath(__file__)
+
+# Constants for configuration keys, pulled from __config.ini
 DEFAULT = 'DEFAULT'
+ENABLE_LOGGING = 'EnableLogging'
 IMAGE_TYPE = 'ImageType'
-SAVE_DIRECTORY = 'SaveDirectory'
+IMG_DIRECTORY = 'SaveDirectory'
 LOG_DIRECTORY = 'LogDirectory'
 FILENAME_PREFIX = 'FilenamePrefix'
 VERBOSE = 'Verbose'
@@ -75,15 +46,10 @@ DIVIDER_NUM = 'DividerNum'
 INDENT_CHAR = 'IndentChar'
 INDENT_SPACES = 'IndentSpaces'
 
-# Begin stopwatch
-start_time = time.perf_counter()
-def stopwatch():
-    elapsed_time = time.perf_counter() - start_time
-    return f"{elapsed_time:.10f}"
-perf_counter_stop = 0
+# main path to pull config file from, also basis for IMG and LOG folders
+MAIN_PATH = os.path.dirname(PY)
 
-# Not necessary for this current iteration but placing it here for futureproofing. To be refactored and expanded later.
-# Get system info for verbose troubleshooting & debugging if necessary
+# get the system info for verbose logging
 SYSTEM_INFO = {
     'System': platform.uname().system,
     'Node Name': platform.uname().node,
@@ -96,25 +62,26 @@ SYSTEM_INFO = {
     'Logical Cores': psutil.cpu_count(logical=True)
 }
 
-# Define the loading of the configuration
+# define how to load the config file
 def load_config_ini():
     """
     Load application configurations from config.ini.
     """
     config = configparser.ConfigParser()
-    config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '__config.ini')
+    config_path = os.path.join(MAIN_PATH, '__config.ini')
     
     if not config.read(config_path):
         raise ValueError(f"Failed to read config file at {config_path}")
     
     return config
 
-# Load the configuration from config file
+# load the config file
 config = load_config_ini()
 
-# Define config variables as constants
+# define various constants
+ENABLE_LOGGING = config[DEFAULT][ENABLE_LOGGING]
 IMG_TYPE = config[DEFAULT][IMAGE_TYPE]
-SAVE_DIRECTORY = config[DEFAULT][SAVE_DIRECTORY]
+IMG_DIRECTORY = config[DEFAULT][IMG_DIRECTORY]
 LOG_DIRECTORY = config[DEFAULT][LOG_DIRECTORY]
 FILENAME_PREFIX = config[DEFAULT][FILENAME_PREFIX]
 VERBOSE_LEVEL = int(config[DEFAULT][VERBOSE])
@@ -122,170 +89,240 @@ DIVIDER_CHAR = config[DEFAULT][DIVIDER_CHAR]
 DIVIDER_NUM = int(config[DEFAULT][DIVIDER_NUM])
 INDENT_CHAR = config[DEFAULT][INDENT_CHAR]
 INDENT_SPACES = int(config[DEFAULT][INDENT_SPACES])
+LOG_PATH = os.path.join(MAIN_PATH, LOG_DIRECTORY, f"LOG__{t}.log")
+IMG_PATH = os.path.join(MAIN_PATH, IMG_DIRECTORY, f"IMG__{t}.png")
 
-# Logging Configuration
+# setup the logging system which prints to terminal and will save a text file later.
 def configure_logging():
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    log_path = os.path.join(script_dir, LOG_DIRECTORY, "LOG__" + now() + ".txt")
-    logging.basicConfig(filename=log_path, level=logging.INFO,
-                        format='%(asctime)s - %(levelname)s - %(message)s')
+    log_path = os.path.join(MAIN_PATH, LOG_DIRECTORY, "LOG__" + t + ".log")
+    logging.basicConfig(filename=log_path, level=logging.NOTSET,
+                        format='%(asctime)s - %(message)s')
 
-# Prints information to the terminal and a log file
-def log(message, level=1, marker="", comment=""):
-    #todo : check IF message is a dict, reformat it appropriately with indentation.
-    #todo : check IF message is an array, reformat it...
+# run the logging setup
+configure_logging()
+
+### FCN__log.py
+# todo refactor
+def log(level, message, emoji=""):
+    # Check if ENABLE_LOGGING is False
+    if ENABLE_LOGGING == 'False':
+        return
+
+    msg = message
+
+    # handle ints
+    if isinstance(msg, int):
+        msg = str(msg)
+        
+    # handle lists
+    elif isinstance(msg, list):
+        for item in msg:
+            message = DIVIDER_CHAR + "\t" + str(item)
+            log(level, message, emoji)
+        return
     
-    message = str(message)
-    # Check for divider line key "---"
-    if message == "---":
-        if VERBOSE_LEVEL>0: 
-            msg_line = "\n"+DIVIDER_CHAR * DIVIDER_NUM+"\n"
-            print(msg_line)
-            logging.info(msg_line)
-            return
+    # handle dictionaries
+    elif isinstance(msg, dict):
+        table = PrettyTable()
+        table.field_names = ["Key", "Value"]
+        
+        # Set alignment to the left for both columns
+        table.align["Key"] = "l"
+        table.align["Value"] = "l"
+        
+        for k, v in msg.items():
+            # Handle nested dictionaries and lists
+            if isinstance(v, dict) or isinstance(v, list):
+                nested_table = PrettyTable()
+                nested_table.field_names = ["Index", "Value"]  # Change the heading to "Index"
+                nested_table.align["Index"] = "l"
+                nested_table.align["Value"] = "l"
+
+                if isinstance(v, dict):
+                    for nested_k, nested_v in v.items():
+                        nested_table.add_row([nested_k, nested_v])
+                elif isinstance(v, list):
+                    for idx, item in enumerate(v):
+                        nested_table.add_row([str(idx), item])
+                    nested_table.junction_char = "-"
+                    nested_table.horizontal_char = "-"
+                    nested_table.padding_width = 1
+        
+                table.add_row([k, nested_table])
+            else:
+                table.add_row([k, v])
+        
+
+
+        table.junction_char = "|"
+        table.horizontal_char = "|"
+        table.padding_width = 3
+
+        table_string = str(table)
+        table_lines = table_string.split('\n')
+        for line in table_lines:
+            log(level, line, emoji)
+        # Customize the table junction characters and horizontal padding
+        
+        return
     
-    """
-    Print and log the provided message based on the verbose level.
-    """
-    # Get the number of indents and breaks from arg 2
+    # Check for emoji
+    if emoji:
+        msg = emoji + "  " + msg
+
+    # Shortcut for adding stopwatch to intermediate success flag
+    if msg == "Success":
+        msg = "✔️  at " + stopwatch() + " sec"
+
+    # build indentation per line
     indent = (INDENT_CHAR + " " * INDENT_SPACES) * level
-    breaks = ""
 
-    # Add breaks based on verbose level
-    #if level<3: breaks = "\n"
-    #if level<2: breaks = "\n\n"
-    #if level<1: breaks = "\n\n\n"
+    # build a divider if the input is "---"
+    if msg == "---" and VERBOSE_LEVEL > 0:
+        msg_line = "\n" + DIVIDER_CHAR * DIVIDER_NUM + "\n"
+        print(msg_line)
+        logging.info(msg_line)
+        return
 
+    msg_line = indent + msg
 
-    # Use a different indentation format if a "marker" is specified    
-    if marker: indent = (marker + '  ') * level
-    msg_line = breaks + indent + message
-
-    # Add line breaks for formatting
-    if comment: msg_line += "\n\n" + comment + "\n\n"
-    msg_line += breaks
+    if level==1:
+        msg_line += f""
 
     if VERBOSE_LEVEL >= level:
         print(msg_line)
     
-    # Log everything, regardless of verbose level.
-    # SAVE LOG TO TXT FILE 
     logging.info(msg_line)
+print()
+log(0, f"Running {APP_NAME}", "▶️")
+log(1, f"Time begin: {t}")
+log(2, f"T62: {T62}")
 
-# This is the shortcut for adding a line divider
-log("---")
+log(1, "---")
 
-# Log app name information
-log(APP_NAME)
-log(PY,2)
-log("##todo add folder path tree",3)
-log("Current time: " + t, 2)
+log(1, "INITIALIZING", "▶️")
+log(2, f"Script path: {PY}", "📂")
+log(3, "SYSTEM_INFO")
+log(3, SYSTEM_INFO, "ℹ️")
+log(3, "NETWORK_INFO", "🌐")
+log(3, "coming soon")
 
-# Print log path to log
-log("Logging to: " + os.path.join(os.path.dirname(os.path.abspath(__file__)), LOG_DIRECTORY, "LOG__" + now() + ".txt"),2)
+def ok(level = 0):
+    log(level,f"⏱️  {stopwatch()} sec","")
 
-log("---")
-log("INITIALIZING...", 1)
-log("Reading config.ini", 2)
-log(str(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config.ini')), 3)
+def get_display_info():
+    primary_monitor = get_monitors()[0]  # Get the primary monitor (monitor 0)
 
-# note to self
-# config info, EDIT CODE HERE to refactor the parsing of dictionaries to strings, via a helper function called dict_to_indented_string(dict, level=3, marker="-") which applies the indents similar to `log_message(f"{key}: {value}", level=3)`. This would also be helpful at the end when we print the system information
+    monitor_info = {
+        "name": primary_monitor.name,
+        "width": primary_monitor.width,
+        "height": primary_monitor.height,
+        "width_mm": primary_monitor.width_mm,    # Width in millimeters
+        "height_mm": primary_monitor.height_mm,  # Height in millimeters
+        "is_primary": primary_monitor.is_primary,
+    }
 
-def get_config_ini():
-    if VERBOSE_LEVEL >= 3:
-        log("[DEFAULT]",4)
+    return monitor_info
 
-        for key, value in config[DEFAULT].items():
-            log(f"{key}: {value}", 4)
+log(3, "DISPLAY_INFO")
+DISPLAY_INFO = get_display_info()
+log(3, DISPLAY_INFO, "🖥️")
 
-get_config_ini()
 
-# note to self
-# Analysis of a saved image, to expand upon this and refactor later
-def analyze_image(image, save_path):
-    """
-    Analyze the given image for various attributes.
-    Returns a dictionary with the findings.
-    """
+log(2, f"Logging to ------ {MAIN_PATH}\{LOG_DIRECTORY}")
+
+def get_screenshot():
+    global perf_counter_stop
+    ok(2)
+    log(1, "CAPTURING", "📷")
+    log(2, "Capturing a screenshot..")
+    try:
+        perf_counter_stop = stopwatch()
+        
+        image = ImageGrab.grab()
+        # Collect image information into a dictionary
+        image_info = {
+            "Image Size": str(image.size),
+            "Color Mode": image.mode,
+            "Memory Address": hex(id(image)),
+            "Image Format": str(image.format),
+            "Meta Information": str(image.info),
+        }
+
+        # Log the image information using the log function
+        log(3, image_info, "↪️")
+
+        log(3, "Success")
+        return image
+    except Exception as e:
+        error_message = f"\n\nAn error occurred: {type(e).__name__} - {e}\n\n"
+        log(1, error_message)
+        return False
+
+def save_screenshot(image):
+    log(2, f"Saving screenshot to {IMG_DIRECTORY}")
+    image.save(IMG_PATH)
+    log(3, f"IMG saved {IMG_PATH}")
+    
+    # Count the number of files beginning with "IMG__" adjacent to the image at IMG_PATH
+    img_file_count = sum(1 for file in os.listdir(MAIN_PATH + "\\" + IMG_DIRECTORY) if file.startswith("IMG__"))
+    log(4, f"IMG file count: {img_file_count}")
+    
+    log(3, "Success")
+    log(1, f"CAPTURED SUCCESSFULLY in {perf_counter_stop} seconds.", "🖼️")
+
+
+def analyze_image(image, file_path):
     stats = ImageStat.Stat(image)
     width, height = image.size
-    file_size = os.path.getsize(save_path)
+    file_size = os.path.getsize(file_path)  # Use the passed file path
+
+    # Brightness: Average brightness of the image (1 is original brightness)
+    brightness = ImageEnhance.Brightness(image)
+    avg_brightness = sum(brightness.enhance(1).convert("L").point(lambda p: p).getdata()) / (width * height)
+
+    # Contrast: Average contrast of the image (1 is original contrast)
+    contrast = ImageEnhance.Contrast(image)
+    avg_contrast = sum(contrast.enhance(1).convert("L").point(lambda p: p).getdata()) / (width * height)
+
+    # Sharpness: Average sharpness of the image (1 is original sharpness)
+    sharpness = ImageEnhance.Sharpness(image)
+    avg_sharpness = sum(sharpness.enhance(1).convert("L").point(lambda p: p).getdata()) / (width * height)
+
+    # Entropy: Measures the amount of information/randomness in the image
+    entropy = image.entropy()
 
     findings = {
         'Resolution': f"{width}x{height}",
         'File Size': f"{file_size / 1024:.2f} KB",
         'Mean Color': stats.mean,
         'Extrema': stats.extrema,
+        'Brightness': avg_brightness,
+        'Contrast': avg_contrast,
+        'Sharpness': avg_sharpness,
+        'Entropy': entropy,
     }
     
     return findings
 
-# to be refactored?
-def save_screenshot():
-    global perf_counter_stop
-    """
-    Capture and save a screenshot.
-    """
-    log("CAPTURING...")
+# take the screenshot now
 
-    log("Attempting to capture screenshot...", 2)
-    
-    try:
-        IMG = ImageGrab.grab()
-        IMG.filename = FILENAME_PREFIX + str(now())
-        IMG.filetype = IMG_TYPE
+image = get_screenshot()
+save_screenshot(image)  # Save the image before analyzing
 
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        save_path = os.path.join(script_dir, SAVE_DIRECTORY, IMG.filename + "." + IMG.filetype)
+if VERBOSE_LEVEL > 1:
+    # log the image analysis
+    log(2, "Analyzing IMG file..")
+    image_data = analyze_image(image, IMG_PATH)  # Pass the path to the saved image
+    log(3, image_data, "🔬")
+    log(3, "Success")
 
-        log(f"Saving screenshot to {save_path}", 3)
-        IMG.save(save_path)
-        
-        log("SUCCESS.")
-        log(f"Saved IMG successfully at {save_path}", level=2)
-        log("##todo FOLDER TREE HERE VIA `dict__log(path__dict(save_path))`", 3)
+log(1, "---")
+log(0, f"COMPLETE", "✅")
+#State the result
+log(1, f"IMG__SCREENSHOT saved to {MAIN_PATH}\{IMG_DIRECTORY}", "⤵️")
+log(1, f"Completed {APP_NAME} at {MAIN_PATH}", "⏹️")
+log(2, f"Run time {stopwatch()} seconds", "⌚")
+log(3, f"T62={t62()}")
 
-        log("ANALYZING...")
-        if VERBOSE_LEVEL >= 2:
-            image_data = analyze_image(IMG, save_path) # `dict__log(path__dict(image_data))` 
-            for key, value in image_data.items():
-                log(f"{key}: {value}", level=2)
-        log("RESULTS LOGGED.")
-        # Print log path to log
-        log("Log file: = " + os.path.join(os.path.dirname(os.path.abspath(__file__)), LOG_DIRECTORY, "LOG__" + now() + ".txt"),2)
-
-
-        log("---")
-        log("APP directory: " + script_dir)
-        perf_counter_stop = stopwatch()
-        log("COMPLETED SUCCESSFULLY in " + perf_counter_stop +  "seconds.\n",1)
-        
-        log("Python version ")
-        log("# path to python.exe")
-        log("# list dependencies")
-        
-        log("---")
-        
-        log("CURRENT TIME " + str(now()),2)
-        return True
-
-    except Exception as e:
-        error_message = f"An error occurred: {type(e).__name__} - {e}"
-        log(error_message, level=1)
-        return False
-
-if __name__ == '__main__':
-    result = save_screenshot()
-    if not result:
-        log("Screenshot saving failed.", level=1)
-    
-    # Verbose Level 6: Gather and print system info
-    if VERBOSE_LEVEL >= 6:
-        log("SYSTEM_INFO", 5)
-        system_info = SYSTEM_INFO
-        for key, value in system_info.items():
-            log(f"{key}: {value}", level=6)
-        print()
-        
-    log("\n📷 🤖 ✅ Success at " + perf_counter_stop + " seconds >>> IMG__SCREENSHOT saved to " + os.path.dirname(os.path.abspath(__file__)) + "\\" + SAVE_DIRECTORY + "\n",0)
+log(1, "---")
